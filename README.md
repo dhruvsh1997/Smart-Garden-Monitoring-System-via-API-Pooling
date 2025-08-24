@@ -338,6 +338,10 @@ export FLASK_DEBUG=1
 python app.py
 ```
 
+## Test
+# Pylint Test : 
+```pylint --disable=W,C,R app.py > errors.txt```  
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
