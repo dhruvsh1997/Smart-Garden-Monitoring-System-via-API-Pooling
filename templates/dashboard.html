@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Garden Monitoring System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f0f8f0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .garden-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        .sensor-card {
+            border-radius: 10px;
+            margin-bottom: 20px;
+            transition: transform 0.3s;
+        }
+        .sensor-card:hover {
+            transform: translateY(-5px);
+        }
+        .sensor-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        .alert-banner {
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .last-updated {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+        .plant-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="garden-container">
+        <div class="text-center mb-4">
+            <h1 class="display-4">🌱 Smart Garden Monitor</h1>
+            <p class="lead">Monitoring your plants' health with API polling</p>
+        </div>
+        
+        <!-- Status Banner -->
+        <div id="status-banner" class="alert alert-info alert-banner">
+            <div class="d-flex align-items-center">
+                <div class="plant-icon">🪴</div>
+                <div class="ms-3">
+                    <h5 id="status-title">Checking garden status...</h5>
+                    <p id="status-message" class="mb-0">Please wait while we fetch the latest sensor data.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sensor Cards -->
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card sensor-card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Soil Moisture</h5>
+                        <div class="sensor-value" id="moisture-value">--%</div>
+                        <div class="progress mt-2">
+                            <div id="moisture-bar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card sensor-card bg-warning text-dark">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Sunlight</h5>
+                        <div class="sensor-value" id="sunlight-value">--%</div>
+                        <div class="progress mt-2">
+                            <div id="sunlight-bar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card sensor-card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Temperature</h5>
+                        <div class="sensor-value" id="temperature-value">--°C</div>
+                        <div class="progress mt-2">
+                            <div id="temperature-bar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Last Updated -->
+        <div class="text-center mt-4">
+            <p class="last-updated">Last updated: <span id="last-updated">Never</span></p>
+            <p class="text-muted">Next update in <span id="countdown">--</span> seconds</p>
+        </div>
+    </div>
+
+    <script>
+        // Polling configuration
+        const POLL_INTERVAL = 120000; // 2 minutes (120000 ms)
+        const COUNTDOWN_INTERVAL = 1000; // 1 second
+        
+        let countdownTimer;
+        let nextPollTime = Date.now() + POLL_INTERVAL;
+        
+        // Function to fetch garden status
+        function fetchGardenStatus() {
+            fetch('/api/garden-status')
+                .then(response => response.json())
+                .then(data => {
+                    updateDashboard(data);
+                    resetCountdown();
+                })
+                .catch(error => {
+                    console.error('Error fetching garden status:', error);
+                    document.getElementById('status-title').textContent = "Connection Error";
+                    document.getElementById('status-message').textContent = "Could not fetch sensor data. Will retry shortly.";
+                    document.getElementById('status-banner').className = 'alert alert-danger alert-banner';
+                });
+        }
+        
+        // Function to update the dashboard with new data
+        function updateDashboard(data) {
+            // Update sensor values
+            document.getElementById('moisture-value').textContent = data.sensor_data.soil_moisture.toFixed(1) + '%';
+            document.getElementById('sunlight-value').textContent = data.sensor_data.sunlight.toFixed(1) + '%';
+            document.getElementById('temperature-value').textContent = data.sensor_data.temperature.toFixed(1) + '°C';
+            
+            // Update progress bars
+            document.getElementById('moisture-bar').style.width = data.sensor_data.soil_moisture + '%';
+            document.getElementById('sunlight-bar').style.width = data.sensor_data.sunlight + '%';
+            document.getElementById('temperature-bar').style.width = ((data.sensor_data.temperature - 5) / 30 * 100) + '%';
+            
+            // Update last updated time
+            document.getElementById('last-updated').textContent = data.sensor_data.last_updated;
+            
+            // Update status banner
+            const statusBanner = document.getElementById('status-banner');
+            const statusTitle = document.getElementById('status-title');
+            const statusMessage = document.getElementById('status-message');
+            
+            if (data.status === 'healthy') {
+                statusBanner.className = 'alert alert-success alert-banner';
+                statusTitle.textContent = "Your plants are happy! 🌿";
+                statusMessage.textContent = "All sensor readings are within normal ranges.";
+            } else {
+                statusBanner.className = 'alert alert-warning alert-banner';
+                statusTitle.textContent = "Your plants need attention! 🚨";
+                statusMessage.textContent = data.alerts.join(' ');
+            }
+        }
+        
+        // Function to reset the countdown timer
+        function resetCountdown() {
+            nextPollTime = Date.now() + POLL_INTERVAL;
+            updateCountdown();
+        }
+        
+        // Function to update the countdown display
+        function updateCountdown() {
+            const now = Date.now();
+            const timeLeft = Math.max(0, Math.floor((nextPollTime - now) / 1000));
+            
+            document.getElementById('countdown').textContent = timeLeft;
+            
+            if (timeLeft <= 0) {
+                fetchGardenStatus();
+            }
+        }
+        
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initial fetch
+            fetchGardenStatus();
+            
+            // Start countdown timer
+            countdownTimer = setInterval(updateCountdown, COUNTDOWN_INTERVAL);
+        });
+    </script>
+</body>
+</html>
